@@ -1,0 +1,38 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Caminho da imagem no Google Colab
+caminho_imagem = '/content/lagoa2.0PRONTA.jpeg'
+
+# 1. Carregar a imagem em escala de cinza
+img = cv2.imread(caminho_imagem, cv2.IMREAD_GRAYSCALE)
+
+if img is None:
+    raise FileNotFoundError(f"Não foi possível carregar a imagem em: {caminho_imagem}. Verifique se o arquivo foi enviado corretamente.")
+
+# 2. Aplicar a Transformada de Fourier 2D
+f_transform = np.fft.fft2(img)
+
+# 3. Deslocar o componente de frequência zero (DC) para o centro do espectro
+f_shift = np.fft.fftshift(f_transform)
+
+# 4. Calcular o espectro de magnitude com ajuste logarítmico
+magnitude_spectrum = 20 * np.log(np.abs(f_shift) + 1)
+
+# 5. Plotar a imagem original e o espectro de frequência
+plt.figure(figsize=(14, 7))
+
+plt.subplot(1, 2, 1)
+plt.imshow(img, cmap='gray')
+plt.title('Imagem Original (Nebulosa)')
+plt.axis('off')
+
+plt.subplot(1, 2, 2)
+plt.imshow(magnitude_spectrum, cmap='inferno') 
+plt.title('Espectro de Frequência (FFT)')
+plt.colorbar(label='Magnitude (dB)')
+plt.axis('off')
+
+plt.tight_layout()
+plt.show()
