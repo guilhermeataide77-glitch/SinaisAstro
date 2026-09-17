@@ -1,0 +1,69 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Caminho da imagem (mantenha o mesmo do teste anterior)
+caminho_imagem = '/content/lagoa2.0PRONTA.jpeg'
+
+# 1. Carregar a imagem em escala de cinza
+img = cv2.imread(caminho_imagem, cv2.IMREAD_GRAYSCALE)
+if img is None:
+    raise FileNotFoundError(f"Imagem não encontrada em: {caminho_imagem}")
+
+# 2. Aplicar FFT e centralizar
+f_transform = np.fft.fft2(img)
+f_shift = np.fft.fftshift(f_transform)
+
+# 3. Criar o Filtro Passa-Alta (High-Pass Filter)
+# Vamos criar uma máscara circular no centro com valor 0 (bloqueia)
+# e o resto da imagem com valor 1 (passa).
+
+linhas, colunas = img.shape
+centro_r, centro_c = linhas // 2, colunas // 2
+
+# Define o raio do filtro (quanto maior o raio, mais nebulosidade é removida)
+# Ajuste este valor dependendo de quão 'grandes' são as estrelas que você quer manter.
+raio_filtro = 15  
+
+mascara = np.ones((linhas, colunas), np.uint8)
+cv2.circle(mascara, (centro_c, centro_r), raio_filtro, 0, -1)
+
+# 4. Aplicar a máscara ao espectro de frequência
+f_shift_filtrado = f_shift * mascara
+
+# 5. Calcular o espectro de magnitude FILTRADO (para visualização)
+magnitude_spectrum_filtrado = 20 * np.log(np.abs(f_shift_filtrado) + 1)
+
+# 6. Aplicar a Transformada Inversa de Fourier (IFFT)
+# Deslocar de volta para o canto (ifftshift) e depois aplicar ifft2
+f_inv_shift = np.fft.ifftshift(f_shift_filtrado)
+img_reconstruida = np.fft.ifft2(f_inv_shift)
+
+# O resultado da IFFT é complexo, pegamos o valor absoluto e convertemos para uint8
+img_reconstruida = np.abs(img_reconstruida)
+# Normalizar para o intervalo 0-255 e converter para inteiro
+img_estrelas = cv2.normalize(img_reconstruida, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8U)
+
+# 7. Plotar os resultados
+plt.figure(figsize=(16, 8))
+
+# Imagem Original
+plt.subplot(1, 3, 1)
+plt.imshow(img, cmap='gray')
+plt.title('Imagem Original')
+plt.axis('off')
+
+# Espectro de Frequência Filtrado (com o buraco preto no centro)
+plt.subplot(1, 3, 2)
+plt.imshow(magnitude_spectrum_filtrado, cmap='inferno')
+plt.title(f'Espectro Filtrado (Raio={raio_filtro})')
+plt.axis('off')
+
+# Imagem Reconduzida (Apenas Estrelas)
+plt.subplot(1, 3, 3)
+plt.imshow(img_estrelas, cmap='gray')
+plt.title('Isolamento de Estrelas (Filtragem Passa-Alta)')
+plt.axis('off')
+
+plt.tight_layout()
+plt.show()
