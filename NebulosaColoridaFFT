@@ -1,0 +1,78 @@
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Caminho da imagem no Google Colab
+caminho_imagem = '/content/lagoa2.0PRONTA.jpeg'
+
+# 1. Carregar a imagem colorida
+img_bgr = cv2.imread(caminho_imagem, cv2.IMREAD_COLOR)
+if img_bgr is None:
+    raise FileNotFoundError(f"Não foi possível carregar a imagem em: {caminho_imagem}")
+
+# Converter de BGR para RGB para o Matplotlib exibir corretamente
+img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+linhas, colunas, _ = img_rgb.shape
+
+# 2. Criar o Filtro Passa-Baixa bruto (mantém os cantos, zera o centro)
+raio_filtro = 30  # Ajuste o raio para controlar o quanto da nebulosa/suavização deseja
+
+mascara_central = np.zeros((linhas, colunas), np.uint8)
+centro_r, centro_c = linhas // 2, colunas // 2
+cv2.circle(mascara_central, (centro_c, centro_r), raio_filtro, 1, -1)
+mascara_passa_baixa = 1 - mascara_central  # 1 nos cantos (baixas freq), 0 no centro
+
+# 3. Separar os canais de cor e aplicar a FFT + Filtro + IFFT em cada um
+canais = cv2.split(img_rgb)
+canais_filtrados = []
+espectros_exibicao = []
+
+for canal in canais:
+    # Aplicar FFT bruta (sem shift)
+    f_transform = np.fft.fft2(canal)
+    
+    # Aplicar o filtro passa-baixa no domínio de frequência bruto
+    f_transform_filtrado = f_transform * mascara_passa_baixa
+    
+    # Gerar o espectro para exibição (usando fftshift para centralizar visualmente)
+    espectro_viz = 20 * np.log(np.abs(np.fft.fftshift(f_transform_filtrado)) + 1)
+    espectros_exibicao.append(espectro_viz)
+    
+    # Aplicar a Transformada Inversa (IFFT)
+    f_inv = np.fft.ifft2(f_transform_filtrado)
+    
+    # Processar o resultado para o intervalo de 0 a 255
+    canal_inv_abs = np.abs(f_inv)
+    canal_normalizado = cv2.normalize(canal_inv_abs, None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8U)
+    canais_filtrados.append(canal_normalizado)
+
+# 4. Unir os canais filtrados de volta em uma imagem colorida
+img_suavizada_colorida = cv2.merge(canais_filtrados)
+
+# Combinar os espectros dos 3 canais para exibir uma visualização colorida do espectro filtrado
+espectro_colorido = cv2.merge([
+    cv2.normalize(espectros_exibicao[0], None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8U),
+    cv2.normalize(espectros_exibicao[1], None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8U),
+    cv2.normalize(espectros_exibicao[2], None, 255, 0, cv2.NORM_MINMAX, cv2.CV_8U)
+])
+
+# 5. Plotar os resultados
+plt.figure(figsize=(18, 6))
+
+plt.subplot(1, 3, 1)
+plt.imshow(img_rgb)
+plt.title('1. Imagem Original Colorida')
+plt.axis('off')
+
+plt.subplot(1, 3, 2)
+plt.imshow(espectro_colorido)
+plt.title(f'2. Espectro Passa-Baixa (Raio={raio_filtro})')
+plt.axis('off')
+
+plt.subplot(1, 3, 3)
+plt.imshow(img_suavizada_colorida)
+plt.title('3. Nebulosa Suavizada (Colorida)')
+plt.axis('off')
+
+plt.tight_layout()
+plt.show()
